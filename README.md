@@ -1,7 +1,7 @@
 # canny_edge_detection
-Implement Canny edge detection algorithm with C++
-code: canny.cpp
-$ canny image_file
+Implement Canny edge detection algorithm with C++  
+code: canny.cpp  
+$ canny image_file  
 
 # a reference code about without using global variable when call creatTtrackbar
 code: threshold.cpp 
