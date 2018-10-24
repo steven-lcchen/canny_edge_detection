@@ -7,5 +7,5 @@ $ canny image_file
 code: threshold.cpp 
 
 # a openCV command line parser example
-code: cli.cpp 
+code: cli.cpp  
 https://stevenchen886.blogspot.com/2018/09/opencv-example-of-commandlineparser.html
