@@ -314,12 +314,11 @@ void MyCanny (const Mat& src, Mat& dst, double lo_threshold, double hi_threshold
   }
 }
 
-
 /**
  * @function CannyThreshold
  * @brief Trackbar callback - Canny thresholds input with a ratio 1:3
  */
-void CannyThreshold(int bar_val, void* userdata)
+void CannyThreshold(int lo_bar_val, int hi_bar_val, void* userdata)
 {
   tkbar_udata_struct tkbar_udata = *(tkbar_udata_struct*) userdata;
 
@@ -328,8 +327,13 @@ void CannyThreshold(int bar_val, void* userdata)
 
   Mat src_gray;
   Mat detected_edges, dst;
-  const int ratio = 3;
   const int kernel_size = 3;
+  const int ratio = 3;
+  // if (hi_bar_val > lo_bar_val*ratio)
+  //   if (lo_bar_val*ratio > 255)
+  //     hi_bar_val = 255;
+  //   else
+  //     hi_bar_val = lo_bar_val*ratio;
 
   /// Convert the image to grayscale
   MyColorToGray(src, src_gray);
@@ -346,9 +350,9 @@ void CannyThreshold(int bar_val, void* userdata)
 
   /// Canny detector
   #ifdef OCV_CANNY
-    Canny( detected_edges, detected_edges, bar_val, bar_val*ratio, kernel_size, L2GRADIENT);
+    Canny( detected_edges, detected_edges, lo_bar_val, hi_bar_val, kernel_size, L2GRADIENT);
   #else
-    MyCanny(detected_edges, detected_edges, bar_val, bar_val*ratio);
+    MyCanny(detected_edges, detected_edges, lo_bar_val, hi_bar_val);
   #endif
 
   /// Create a matrix of the same type and size as src (for dst)
@@ -362,12 +366,37 @@ void CannyThreshold(int bar_val, void* userdata)
   imshow( window_name, dst );
 }
 
+void LoTkBar_Change(int pos, void* userdata)
+{
+  tkbar_udata_struct tkbar_udata = *(tkbar_udata_struct*) userdata;
+  int loThreshold = pos;
+  int hiThreshold = getTrackbarPos ("Max Threshold:", tkbar_udata.window_name);
+  if (loThreshold > hiThreshold)
+    setTrackbarPos ("Max Threshold:", tkbar_udata.window_name, loThreshold);
+  // cout << "lo_bar_val is:" << loThreshold << endl;
+  // cout << "hi_bar_val is:" << hiThreshold << endl;
+  CannyThreshold(loThreshold, hiThreshold, &tkbar_udata);
+}
+
+void HiTkBar_Change(int pos, void* userdata)
+{
+  tkbar_udata_struct tkbar_udata = *(tkbar_udata_struct*) userdata;
+  int hiThreshold = pos;
+  int loThreshold = getTrackbarPos ("Min Threshold:", tkbar_udata.window_name);
+  if (loThreshold > hiThreshold)
+    setTrackbarPos ("Min Threshold:", tkbar_udata.window_name, hiThreshold);
+  // cout << "lo_bar_val is:" << loThreshold << endl;
+  // cout << "hi_bar_val is:" << hiThreshold << endl;
+  CannyThreshold(loThreshold, hiThreshold, &tkbar_udata);
+}
+
 /** @function main */
 int main( int argc, char** argv )
 {
   Mat src;
-  int lowThreshold = 30;
-  int const max_lowThreshold = 100;
+  int loThreshold = 30;
+  int hiThreshold = 90;
+  int const max_Threshold = 255;
 
   if (argc != 2) {
     cout << "Using Trackbar to adjust Canny edge detection:" << endl;
@@ -388,9 +417,10 @@ int main( int argc, char** argv )
   namedWindow( tkbar_udata.window_name, CV_WINDOW_AUTOSIZE );
 
   /// Create a Trackbar for user to enter threshold
-  createTrackbar( "Min Threshold:", tkbar_udata.window_name, &lowThreshold, max_lowThreshold, CannyThreshold, &tkbar_udata);
+  createTrackbar( "Min Threshold:", tkbar_udata.window_name, &loThreshold, max_Threshold, LoTkBar_Change, &tkbar_udata);
+  createTrackbar( "Max Threshold:", tkbar_udata.window_name, &hiThreshold, max_Threshold, HiTkBar_Change, &tkbar_udata);
   /// Show the image
-  CannyThreshold(lowThreshold, &tkbar_udata);
+  CannyThreshold(loThreshold, hiThreshold, &tkbar_udata);
 
   /// Wait until user exit program by pressing a key
   waitKey(0);

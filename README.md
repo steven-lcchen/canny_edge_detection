@@ -1,5 +1,6 @@
 # canny_edge_detection
 Implement Canny edge detection algorithm with C++  
+practice with 2 Trackbar adjustment for threshold.
 code: canny.cpp  
 $ canny image_file  
 
