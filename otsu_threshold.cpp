@@ -69,15 +69,29 @@ int otsu_threshold (const Mat& frame)
      // }
   }
 
-  //iterate each gray level [0:255]
+  float w0, w1, u0tmp, u1tmp, u0, u1, u, deltaTmp, deltaMax = 0;
+  // Method description:
+  // image MxN
+  // N0: background pixels
+  // N1: foreground pixels
   // w0: background pixels' percentage
   // w1: foreground pixels' percentage
   // u0: background pixels' average gray level
   // u1: foreground pixels' average gray level
   // u: whole image's average gray level
   // deltaXXX: variances of the two classes
-  float w0, w1, u0tmp, u1tmp, u0, u1, u, deltaTmp, deltaMax = 0;
-  for (i = 0; i < GrayScale; i++) // iterate each gray level
+  //
+  // w0 = N0/M×N                   (1)
+  // w1 = N1/M×N                   (2)
+  // N0+N1 = M×N                   (3)
+  // w0+w1 = 1                     (4)
+  // u = w0*u0+w1*u1               (5)
+  // delta = w0(u0-u)^2+w1(u1-u)^2 (6)
+  //       = w0w1(u0-u1)^2
+  // To iterate each gray level, and get the gray level as threshold make delta has maximum value
+
+  //iterate each gray level [0:255]
+  for (i = 0; i < GrayScale; i++)
   {
      w0 = w1 = u0tmp = u1tmp = u0 = u1 = u = deltaTmp = 0;
      for (j = 0; j < GrayScale; j++)
