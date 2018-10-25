@@ -10,6 +10,7 @@
 // #define OCV_BLUR 1
 // #define OCV_CANNY 1
 // #define OCV_SOBEL 1
+// #define OCV_THRESHOLD 1
 #define L2GRADIENT true // For Canny L2gradient precision: true | false
  
 #include <iostream>
@@ -292,26 +293,36 @@ void MyCanny (const Mat& src, Mat& dst, double lo_threshold, double hi_threshold
   }
   imshow("Non-Maximum Suppression", dst);
  
-  // Hysteresis threshold
-  for (int y=1; y<dst.rows-1; y++) 
-  {
-    for (int x=1; x<dst.cols-1; x++) 
+  #ifdef OCV_THRESHOLD
+    threshold(dst, dst, lo_threshold, 255, THRESH_BINARY);
+    // threshold(dst, dst, lo_threshold, 255, CV_THRESH_OTSU);
+
+    // int block_sz = int(lo_threshold/255*dst.cols/2)*2+3;
+    // adaptiveThreshold(dst, dst, 255, ADAPTIVE_THRESH_MEAN_C, THRESH_BINARY, block_sz, 0);
+    // adaptiveThreshold(dst, dst, 255, ADAPTIVE_THRESH_GAUSSIAN_C , THRESH_BINARY, block_sz, 0);
+
+  #else
+    // Hysteresis threshold
+    for (int y=1; y<dst.rows-1; y++) 
     {
-      if (dst.at<uchar>(y, x) >= hi_threshold)
-        dst.at<uchar>(y, x) = 255;
-      else if (dst.at<uchar>(y, x) < lo_threshold)
-        dst.at<uchar>(y, x) = 0;
-      else
+      for (int x=1; x<dst.cols-1; x++) 
       {
-        if (dst.at<uchar>(y-1, x-1) >= hi_threshold || dst.at<uchar>(y-1, x) >= hi_threshold || dst.at<uchar>(y-1, x+1) >= hi_threshold ||
-            dst.at<uchar>(y  , x-1) >= hi_threshold ||                                          dst.at<uchar>(y  , x+1) >= hi_threshold ||
-            dst.at<uchar>(y+1, x-1) >= hi_threshold || dst.at<uchar>(y+1, x) >= hi_threshold || dst.at<uchar>(y+1, x+1) >= hi_threshold)
+        if (dst.at<uchar>(y, x) >= hi_threshold)
           dst.at<uchar>(y, x) = 255;
-        else
+        else if (dst.at<uchar>(y, x) < lo_threshold)
           dst.at<uchar>(y, x) = 0;
+        else
+        {
+          if (dst.at<uchar>(y-1, x-1) >= hi_threshold || dst.at<uchar>(y-1, x) >= hi_threshold || dst.at<uchar>(y-1, x+1) >= hi_threshold ||
+              dst.at<uchar>(y  , x-1) >= hi_threshold ||                                          dst.at<uchar>(y  , x+1) >= hi_threshold ||
+              dst.at<uchar>(y+1, x-1) >= hi_threshold || dst.at<uchar>(y+1, x) >= hi_threshold || dst.at<uchar>(y+1, x+1) >= hi_threshold)
+            dst.at<uchar>(y, x) = 255;
+          else
+            dst.at<uchar>(y, x) = 0;
+        }
       }
     }
-  }
+  #endif
 }
 
 /**
@@ -329,11 +340,6 @@ void CannyThreshold(int lo_bar_val, int hi_bar_val, void* userdata)
   Mat detected_edges, dst;
   const int kernel_size = 3;
   const int ratio = 3;
-  // if (hi_bar_val > lo_bar_val*ratio)
-  //   if (lo_bar_val*ratio > 255)
-  //     hi_bar_val = 255;
-  //   else
-  //     hi_bar_val = lo_bar_val*ratio;
 
   /// Convert the image to grayscale
   MyColorToGray(src, src_gray);
