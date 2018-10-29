@@ -6,11 +6,16 @@
   Author: Steven Chen
 */
 
+#define OCV_CMDLINE 1
 // #define OCV_CVTCOLOR 1
 // #define OCV_BLUR 1
 // #define OCV_CANNY 1
+
+// To use MyCanny function
+#ifndef OCV_CANNY
 // #define OCV_SOBEL 1
-// #define OCV_THRESHOLD 1
+// #define REF_THRESHOLD 1
+#endif
 #define L2GRADIENT true // For Canny L2gradient precision: true | false
  
 #include <iostream>
@@ -19,6 +24,14 @@ using namespace std;
 #include <opencv2/opencv.hpp>
 using namespace cv;
  
+bool DEBUG_SHOW =0;
+
+void imshow(const String & winname, Mat mat)
+{
+  if(DEBUG_SHOW)
+    cv::imshow (winname, mat);
+}
+
 // createTrackbar's UserData Structure
 struct tkbar_udata_struct {
   string window_name;
@@ -26,6 +39,9 @@ struct tkbar_udata_struct {
   tkbar_udata_struct(string winname, Mat im): window_name(winname), img(im) {}
 };
 
+
+// Convert color into gray scale.
+// w/o use float point.
 void MyColorToGray(const Mat& src, Mat& img) // Gray = R*0.299 + G*0.587 + B*0.114
 {
   if (src.channels() == 3) {
@@ -41,7 +57,8 @@ void MyColorToGray(const Mat& src, Mat& img) // Gray = R*0.299 + G*0.587 + B*0.1
           uchar B = src.at<Vec3b>(y, x)[0];
           uchar G = src.at<Vec3b>(y, x)[1];
           uchar R = src.at<Vec3b>(y, x)[2];
-          img.at<uchar>(y, x) = R*0.299 + G*0.587 + B*0.114;
+          // img.at<uchar>(y, x) = R*0.299 + G*0.587 + B*0.114;
+          img.at<uchar>(y, x) = ((uint)R*19595 + (uint)G*38469 + (uint)B*7472) >> 16;
         }
     #endif
   } else {
@@ -72,55 +89,185 @@ void Sort(unsigned char data[9])
   }
 }
 
-void MedianFilting(Mat& img)
+
+// MedianFilting: Remove extreme pixel value (noise) and replace it by medium value of neighbers.
+void MedianFilting(const Mat& src, Mat& dst)
 {
   int d;
   unsigned char data[9];
 
-  int width = img.cols;
-  int height = img.rows;
-
-  for (int i = 1; i < height - 1; i++)
+  Mat raster = Mat::zeros(src.rows+2, src.cols+2, src.type()); 
+  // Copy & Duplicate boundary for image
+  for (int y=0; y<raster.rows; y++) 
   {
-     for (int j = 1; j < width - 1; j++)
+    for (int x=0; x<raster.cols; x++) 
+    {
+      if (y==0)
+        if (x==0)
+          raster.at<uchar>(y, x) = src.at<uchar>(y, x);
+        else if (x==raster.cols-1)
+          raster.at<uchar>(y, x) = src.at<uchar>(y, x-2);
+        else
+          raster.at<uchar>(y, x) = src.at<uchar>(y, x-1);
+      else if (y==raster.rows-1) 
+        if (x==0)
+          raster.at<uchar>(y, x) = src.at<uchar>(y-2, x);
+        else if (x==raster.cols-1)
+          raster.at<uchar>(y, x) = src.at<uchar>(y-2, x-2);
+        else
+          raster.at<uchar>(y, x) = src.at<uchar>(y-2, x-1);
+      else
+        if (x==0)
+          raster.at<uchar>(y, x) = src.at<uchar>(y-1, x);
+        else if (x==raster.cols-1)
+          raster.at<uchar>(y, x) = src.at<uchar>(y-1, x-2);
+        else
+          raster.at<uchar>(y, x) = src.at<uchar>(y-1, x-1);
+    }
+  }
+
+  int width = raster.cols;
+  int height = raster.rows;
+
+  // Execute medium filtering
+  for (int y = 1; y < height - 1; y++)
+  {
+     for (int x = 1; x < width - 1; x++)
      {
         d = 0;
         for (int m = -1; m <= 1; m++)
         {
            for (int n = -1; n <= 1; n++)
            {
-              data[d] = img.at<uchar>(i+n, j+m);
+              data[d] = raster.at<uchar>(y+m, x+n);
               d++;
            }
          }
          Sort(data);
-         img.at<uchar>(i, j) = data[4];
+         dst.at<uchar>(y-1, x-1) = data[4];
       }
    }
 }
+
  
-void BoxFilting(Mat& img)
+// Box Filter: all filter element are 1. average all neighber pixels.
+void BoxFilting(const Mat& src, Mat& dst)
 {
-  unsigned int box;
+  // Duplicate boundary for image
+  Mat raster = Mat::zeros(src.rows+2, src.cols+2, src.type()); 
+  src.copyTo(raster(Rect(1, 1, src.cols, src.rows)));
+  raster.row(1).copyTo(raster.row(0));
+  raster.col(1).copyTo(raster.col(0));
+  raster.col(raster.cols-2).copyTo(raster.col(raster.cols-1));
+  raster.row(raster.rows-2).copyTo(raster.row(raster.rows-1));
 
-  int width = img.cols;
-  int height = img.rows;
-
+  // Average
+  unsigned int average;
+  int width = raster.cols;
+  int height = raster.rows;
   for (int i = 1; i < height - 1; i++)
   {
      for (int j = 1; j < width - 1; j++)
      {
-        box = 0;
+        average = 0;
         for (int m = -1; m <= 1; m++)
         {
            for (int n = -1; n <= 1; n++)
-              box += img.at<uchar>(i+n, j+m);
+              average += raster.at<uchar>(i+m, j+n);
          }
-         img.at<uchar>(i, j) = box/9;
+         dst.at<uchar>(i-1, j-1) = average/9;
       }
    }
 }
  
+
+// OTSU Thresholding is used to automatically perform clustering-based image thresholding.
+int otsu_threshold (const Mat& frame)
+{
+  const int GrayScale = 256;
+  int width = frame.cols;
+  int height = frame.rows;
+  long pixelSum = width * height; 
+  int historgram[GrayScale] = {0};
+  float pixelPro[GrayScale] = {0};
+  int i, j, threshold = 0;
+  uchar* data = (uchar*)frame.data;
+
+  // Count pixels at each gray level
+  for (i = 0; i < height; i++)
+  {
+    for (j = 0; j < width; j++)
+    {
+      historgram[frame.at<uchar>(i, j)]++;
+    }
+  }
+
+  // calculate percentage of gray levels to whole image & its maximum
+  // float maxPro = 0.0;
+  // int kk = 0;
+  for (i = 0; i < GrayScale; i++)
+  {
+     pixelPro[i] = (float)historgram[i] / pixelSum;
+     // if (pixelPro[i] > maxPro)
+     // {
+     //    maxPro = pixelPro[i];
+     //    kk = i;
+     // }
+  }
+
+  float w0, w1, u0tmp, u1tmp, u0, u1, u, deltaTmp, deltaMax = 0;
+  // Method description:
+  // image MxN
+  // N0: background pixels
+  // N1: foreground pixels
+  // w0: background pixels' percentage
+  // w1: foreground pixels' percentage
+  // u0: background pixels' average gray level
+  // u1: foreground pixels' average gray level
+  // u: whole image's average gray level
+  // deltaXXX: variances of the two classes
+  //
+  // w0 = N0/M×N                   (1)
+  // w1 = N1/M×N                   (2)
+  // N0+N1 = M×N                   (3)
+  // w0+w1 = 1                     (4)
+  // u = w0*u0+w1*u1               (5)
+  // delta = w0(u0-u)^2+w1(u1-u)^2 (6)
+  //       = w0w1(u0-u1)^2
+  // To iterate each gray level, and get the gray level as threshold make delta has maximum value
+
+  //iterate each gray level [0:255]
+  for (i = 0; i < GrayScale; i++)
+  {
+     w0 = w1 = u0tmp = u1tmp = u0 = u1 = u = deltaTmp = 0;
+     for (j = 0; j < GrayScale; j++)
+     {
+        if (j <= i)   // background
+        {
+           w0 += pixelPro[j];
+           u0tmp += j * pixelPro[j];
+        }
+        else   // foreground
+        {
+           w1 += pixelPro[j];
+           u1tmp += j * pixelPro[j];
+        }
+     }
+     u0 = u0tmp / w0;
+     u1 = u1tmp / w1;
+     u = u0tmp + u1tmp;
+     deltaTmp = w0 * pow((u0 - u), 2) + w1 * pow((u1 - u), 2);
+     if (deltaTmp > deltaMax)
+     {
+        deltaMax = deltaTmp;
+        threshold = i;
+     }
+  }
+
+  return threshold;
+}
+
+
 void MySobel (const Mat& img, Mat& grad_x, Mat& grad_y)
 {
   // Horizontal filter
@@ -132,34 +279,6 @@ void MySobel (const Mat& img, Mat& grad_x, Mat& grad_y)
   // Duplicate boundary for image
   raster = Mat::zeros(img.rows+2, img.cols+2, img.type()); 
   img.copyTo(raster(Rect(1, 1, img.cols, img.rows)));
-  //// expand boundary
-  // for (int y=0; y<raster.rows; y++) 
-  // {
-  //   for (int x=0; x<raster.cols; x++) 
-  //   {
-  //     if (y==0)
-  //       if (x==0)
-  //         raster.at<uchar>(y, x) = img.at<uchar>(y, x);
-  //       else if (x==raster.cols-1)
-  //         raster.at<uchar>(y, x) = img.at<uchar>(y, x-2);
-  //       else
-  //         raster.at<uchar>(y, x) = img.at<uchar>(y, x-1);
-  //     else if (y==raster.rows-1) 
-  //       if (x==0)
-  //         raster.at<uchar>(y, x) = img.at<uchar>(y-2, x);
-  //       else if (x==raster.cols-1)
-  //         raster.at<uchar>(y, x) = img.at<uchar>(y-2, x-2);
-  //       else
-  //         raster.at<uchar>(y, x) = img.at<uchar>(y-2, x-1);
-  //     else
-  //       if (x==0)
-  //         raster.at<uchar>(y, x) = img.at<uchar>(y-1, x);
-  //       else if (x==raster.cols-1)
-  //         raster.at<uchar>(y, x) = img.at<uchar>(y-1, x-2);
-  //       else
-  //         raster.at<uchar>(y, x) = img.at<uchar>(y-1, x-1);
-  //   }
-  // }
   raster.row(1).copyTo(raster.row(0));
   raster.col(1).copyTo(raster.col(0));
   raster.col(raster.cols-2).copyTo(raster.col(raster.cols-1));
@@ -184,10 +303,17 @@ void MySobel (const Mat& img, Mat& grad_x, Mat& grad_y)
   }
 }
 
-void MyCanny (const Mat& src, Mat& dst, double lo_threshold, double hi_threshold)
+
+/*
+ * @function MyCanny
+ * 1. Get Gradient's magnitude
+ * 2. Non-Maximum Suppression
+ * Note: Full MyCanny function shold include hystersis threshold. As below:
+         void MyCanny(const Mat& src, Mat& dst, int lo_threshold, int hi_threshold)
+ */
+void MyCanny(const Mat& src, Mat& dst)
 {
   Mat grad_x, grad_y; // CV_16S
-  const double PI = 3.1415926535897932384626433832795;
 
   #ifdef OCV_SOBEL
     Sobel(src, grad_x, CV_16S, 1, 0, 3, 1, 0, BORDER_DEFAULT);
@@ -291,41 +417,10 @@ void MyCanny (const Mat& src, Mat& dst, double lo_threshold, double hi_threshold
       }			
     }
   }
-  imshow("Non-Maximum Suppression", dst);
- 
-  #ifdef OCV_THRESHOLD
-    threshold(dst, dst, lo_threshold, 255, THRESH_BINARY);
-    // threshold(dst, dst, lo_threshold, 255, CV_THRESH_OTSU);
-
-    // int block_sz = int(lo_threshold/255*dst.cols/2)*2+3;
-    // adaptiveThreshold(dst, dst, 255, ADAPTIVE_THRESH_MEAN_C, THRESH_BINARY, block_sz, 0);
-    // adaptiveThreshold(dst, dst, 255, ADAPTIVE_THRESH_GAUSSIAN_C , THRESH_BINARY, block_sz, 0);
-
-  #else
-    // Hysteresis threshold
-    for (int y=1; y<dst.rows-1; y++) 
-    {
-      for (int x=1; x<dst.cols-1; x++) 
-      {
-        if (dst.at<uchar>(y, x) >= hi_threshold)
-          dst.at<uchar>(y, x) = 255;
-        else if (dst.at<uchar>(y, x) < lo_threshold)
-          dst.at<uchar>(y, x) = 0;
-        else
-        {
-          if (dst.at<uchar>(y-1, x-1) >= hi_threshold || dst.at<uchar>(y-1, x) >= hi_threshold || dst.at<uchar>(y-1, x+1) >= hi_threshold ||
-              dst.at<uchar>(y  , x-1) >= hi_threshold ||                                          dst.at<uchar>(y  , x+1) >= hi_threshold ||
-              dst.at<uchar>(y+1, x-1) >= hi_threshold || dst.at<uchar>(y+1, x) >= hi_threshold || dst.at<uchar>(y+1, x+1) >= hi_threshold)
-            dst.at<uchar>(y, x) = 255;
-          else
-            dst.at<uchar>(y, x) = 0;
-        }
-      }
-    }
-  #endif
 }
 
-/**
+
+/*
  * @function CannyThreshold
  * @brief Trackbar callback - Canny thresholds input with a ratio 1:3
  */
@@ -339,39 +434,82 @@ void CannyThreshold(int lo_bar_val, int hi_bar_val, void* userdata)
   Mat src_gray;
   Mat detected_edges, dst;
   const int kernel_size = 3;
-  const int ratio = 3;
+  // const int ratio = 3;
 
   /// Convert the image to grayscale
   MyColorToGray(src, src_gray);
 
   /// Reduce noise with a kernel 3x3
   #ifdef OCV_BLUR
-    blur( src_gray, detected_edges, Size(3,3) );
+    blur(src_gray, detected_edges, Size(3,3));
   #else
-    detected_edges = src_gray.clone();
-    MedianFilting(detected_edges); // remove noise
-    BoxFilting(detected_edges); // average
+    MedianFilting(src_gray, src_gray); // remove noise
+    BoxFilting(src_gray, src_gray); // average
   #endif
-  imshow( "Blur of Gray SRC", detected_edges);
+  imshow( "Blur of Gray SRC", src_gray);
 
-  /// Canny detector
+  /// Canny edge detector
   #ifdef OCV_CANNY
-    Canny( detected_edges, detected_edges, lo_bar_val, hi_bar_val, kernel_size, L2GRADIENT);
+    // Canny(src_gray, detected_edges, lo_bar_val, lo_bar_val*ratio, kernel_size, L2GRADIENT);
+    Canny(src_gray, detected_edges, lo_bar_val, hi_bar_val, kernel_size, L2GRADIENT);
   #else
-    MyCanny(detected_edges, detected_edges, lo_bar_val, hi_bar_val);
+    Mat nmax_suppress;
+    MyCanny(src_gray, nmax_suppress);
+    imshow("Non-Maximum Suppression", nmax_suppress);
+
+    detected_edges = Mat::zeros(nmax_suppress.size(), nmax_suppress.type()); // all 0s for set all boundary are not edge
+    // Hysteresis threshold
+    for (int y=1; y<nmax_suppress.rows-1; y++) 
+    {
+      for (int x=1; x<nmax_suppress.cols-1; x++) 
+      {
+        if (nmax_suppress.at<uchar>(y, x) >= hi_bar_val)
+          detected_edges.at<uchar>(y, x) = 255;
+        else if (nmax_suppress.at<uchar>(y, x) < lo_bar_val)
+          detected_edges.at<uchar>(y, x) = 0;
+        else
+          if (nmax_suppress.at<uchar>(y-1, x-1) >= hi_bar_val || nmax_suppress.at<uchar>(y-1, x) >= hi_bar_val || nmax_suppress.at<uchar>(y-1, x+1) >= hi_bar_val ||
+              nmax_suppress.at<uchar>(y  , x-1) >= hi_bar_val ||                                                  nmax_suppress.at<uchar>(y  , x+1) >= hi_bar_val ||
+              nmax_suppress.at<uchar>(y+1, x-1) >= hi_bar_val || nmax_suppress.at<uchar>(y+1, x) >= hi_bar_val || nmax_suppress.at<uchar>(y+1, x+1) >= hi_bar_val)
+            detected_edges.at<uchar>(y, x) = 255;
+          else
+            detected_edges.at<uchar>(y, x) = 0;
+      }
+    }
+    cv::imshow("Canny_detected_edges", detected_edges);
+ 
+    // To reference with other threshold method
+    #ifdef REF_THRESHOLD
+      Mat threshold_mat;
+      threshold(nmax_suppress, threshold_mat, lo_bar_val, 255, THRESH_BINARY);
+      imshow("Compare w/ OpenCV Constant Threshold", threshold_mat);
+    
+      threshold(nmax_suppress, threshold_mat, lo_bar_val, 255, CV_THRESH_OTSU);
+      imshow("Compare w/ OpenCV OTSU Threshold", threshold_mat);
+
+      int block_sz = int(lo_bar_val/255*nmax_suppress.cols/2)*2+3;
+      adaptiveThreshold(nmax_suppress, threshold_mat, 255, ADAPTIVE_THRESH_MEAN_C, THRESH_BINARY, block_sz, 0);
+      // adaptiveThreshold(nmax_suppress, threshold_mat, 255, ADAPTIVE_THRESH_GAUSSIAN_C , THRESH_BINARY, block_sz, 0);
+      imshow("Compare w/ OpenCV adaptive Threshold", threshold_mat);
+
+      int my_otsu_thval = otsu_threshold (nmax_suppress);
+      threshold(nmax_suppress, threshold_mat, my_otsu_thval, 255, THRESH_BINARY);
+      imshow("Compare w/ My OTSU Threshold", threshold_mat);
+
+    #endif
   #endif
-
   /// Create a matrix of the same type and size as src (for dst)
-  dst.create( src.size(), src.type() );
+  // dst.create( src.size(), src.type() );
+  // dst = Scalar::all(0);
+  dst = Mat::zeros(src.size(), src.type());
 
-  /// Using Canny's output as a mask, we display our result
-  dst = Scalar::all(0);
-
-  src.copyTo( dst, detected_edges);
-  imshow("Canny_detected_edges", detected_edges);
-  imshow( window_name, dst );
+  /// Using Canny's output as a mask, and display result
+  src.copyTo(dst, detected_edges);
+  cv::imshow(window_name, dst);
 }
 
+
+// Low threshold track bar
 void LoTkBar_Change(int pos, void* userdata)
 {
   tkbar_udata_struct tkbar_udata = *(tkbar_udata_struct*) userdata;
@@ -384,6 +522,7 @@ void LoTkBar_Change(int pos, void* userdata)
   CannyThreshold(loThreshold, hiThreshold, &tkbar_udata);
 }
 
+// High threshold track bar
 void HiTkBar_Change(int pos, void* userdata)
 {
   tkbar_udata_struct tkbar_udata = *(tkbar_udata_struct*) userdata;
@@ -396,40 +535,69 @@ void HiTkBar_Change(int pos, void* userdata)
   CannyThreshold(loThreshold, hiThreshold, &tkbar_udata);
 }
 
+
+
 /** @function main */
+
+const String keys =
+    "{h help usage ? |      | print this message    }"
+    "{@image_file    |      | image file for process}"
+    "{d debug show   |      | show image for debug  }"
+    ;
+
 int main( int argc, char** argv )
 {
-  Mat src;
+  // Parse command line 
+  #ifdef OCV_CMDLINE
+    CommandLineParser parser(argc, argv, keys);
+    parser.about("Using Trackbar to adjust Canny edge detection.");
+
+    if (parser.has("?"))
+    {
+       parser.printMessage();
+       return 0;
+    }
+    String filename = parser.get<String>(0);
+    DEBUG_SHOW = parser.has("debug");
+
+  #else
+    if (argc < 2 || argc > 3) {
+      cout << "Using Trackbar to adjust Canny edge detection:" << endl;
+      cout << argv[0] << " <image_file> [0|1: for show debug image]" << endl;
+      return -1;
+    }
+    else if (argc == 3)
+    {
+      DEBUG_SHOW = (bool)atoi(argv[2]);
+    }
+    string filename = argv[1];
+  #endif
+
+  // Load an image
+  Mat src = imread(filename, IMREAD_UNCHANGED);
+  if ( !src.data ) {
+    cout << "Fail to open file: " << argv[1] << endl << endl;
+    cout << "Using Trackbar to adjust Canny edge detection:" << endl;
+    cout << argv[0] << " <image_file> [0|1: for show debug image]" << endl;
+    return -1;
+  }
+  cv::imshow( "SRC img", src);
+  cout << "DEBUG_SHOW= " << DEBUG_SHOW << endl;
+
   int loThreshold = 30;
   int hiThreshold = 90;
   int const max_Threshold = 255;
-
-  if (argc != 2) {
-    cout << "Using Trackbar to adjust Canny edge detection:" << endl;
-    cout << argv[0] << " image_file" << endl;
-    return -1;
-  }
-  /// Load an image
-  src = imread(argv[1], IMREAD_UNCHANGED);
-  if( !src.data ) {
-    cout << "Fail to open file: " << argv[1] << endl << endl;
-    return -1;
-  }
-  imshow( "SRC img", src);
-
   tkbar_udata_struct tkbar_udata("Edge Map", src);
 
-  /// Create a window
+  // Create a image window
   namedWindow( tkbar_udata.window_name, CV_WINDOW_AUTOSIZE );
-
-  /// Create a Trackbar for user to enter threshold
-  createTrackbar( "Min Threshold:", tkbar_udata.window_name, &loThreshold, max_Threshold, LoTkBar_Change, &tkbar_udata);
-  createTrackbar( "Max Threshold:", tkbar_udata.window_name, &hiThreshold, max_Threshold, HiTkBar_Change, &tkbar_udata);
-  /// Show the image
+  // Create a Trackbar for user to adjust high/low threshold
+  createTrackbar( "Low Threshold:", tkbar_udata.window_name, &loThreshold, max_Threshold, LoTkBar_Change, &tkbar_udata);
+  createTrackbar( "High Threshold:", tkbar_udata.window_name, &hiThreshold, max_Threshold, HiTkBar_Change, &tkbar_udata);
+  // Initial callback function
   CannyThreshold(loThreshold, hiThreshold, &tkbar_udata);
 
-  /// Wait until user exit program by pressing a key
+  // Wait until user exit program by pressing a key
   waitKey(0);
-
   return 0;
 }
