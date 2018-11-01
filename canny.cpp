@@ -592,7 +592,7 @@ int main( int argc, char** argv )
   // Create a image window
   namedWindow( tkbar_udata.window_name, CV_WINDOW_AUTOSIZE );
   // Create a Trackbar for user to adjust high/low threshold
-  createTrackbar( "Low Threshold:", tkbar_udata.window_name, &loThreshold, max_Threshold, LoTkBar_Change, &tkbar_udata);
+  createTrackbar( "Low Threshold:",  tkbar_udata.window_name, &loThreshold, max_Threshold, LoTkBar_Change, &tkbar_udata);
   createTrackbar( "High Threshold:", tkbar_udata.window_name, &hiThreshold, max_Threshold, HiTkBar_Change, &tkbar_udata);
   // Initial callback function
   CannyThreshold(loThreshold, hiThreshold, &tkbar_udata);
