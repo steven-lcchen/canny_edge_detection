@@ -23,7 +23,7 @@ void MyColorToGray(const Mat& src, Mat& img); // Gray = R*0.299 + G*0.587 + B*0.
 void MedianFilter(const Mat& src, Mat& dst);
 void BoxFilter(const Mat& src, Mat& dst);
 void MyCanny(const Mat& src, Mat& detected_edges, int lo_threshold, int hi_threshold, bool L2gradient=true, bool debug=false);
-uint LabelConnected(const Mat& img, Mat& label, uint connectivity=8);
+int  LabelConnected(const Mat& img, Mat& label, uint connectivity=8);
 
 // createTrackbar's UserData Structure
 struct tkbar_udata_struct {
@@ -108,7 +108,7 @@ void Adj_CannyThreshold(int lo_bar_val, int hi_bar_val, void* userdata)
     Mat mask= labels==i;
     output.setTo(randomColor(rnd_num), mask);
     // imshow("mask"+to_string(i), output); // Steven
-    cout<<"Size of object["<<i<<"]="<<countNonZero(mask)<<endl;
+    // cout<<"Size of object["<<i<<"]="<<countNonZero(mask)<<endl;
   }
   imshow("Result", output);
 }

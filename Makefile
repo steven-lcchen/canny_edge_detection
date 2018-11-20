@@ -7,7 +7,7 @@ test_CmdLineParser: test_CmdLineParser.o
 	./compile.sh -o $@ $^
 
 # Test otsu threshold algorithm
-test_threshold: test_threshold.o otsu_threshold.o
+test_threshold: test_threshold.o otsu_threshold.o LabelConnected.o
 	./compile.sh -o $@ $^
 
 # Test Canny edge detection
