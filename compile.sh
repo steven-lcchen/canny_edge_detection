@@ -18,3 +18,5 @@ do
 done
 echo  g++ -o $output ${POSITIONAL[@]} `pkg-config --cflags --libs opencv --libs gl`
 g++ -o $output ${POSITIONAL[@]} `pkg-config --cflags --libs opencv --libs gl`
+
+echo ""

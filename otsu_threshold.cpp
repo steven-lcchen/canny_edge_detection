@@ -10,9 +10,11 @@ using namespace std;
 #include <opencv2/opencv.hpp>
 using namespace cv;
  
-// input,  src: 8-bits 1-channel gray image
-// output, dst: OTSU binary image, 8-bits 1-channel binary image
-int otsu_threshold (const Mat& src, Mat& dst) {
+// src: input,  8-bits 1-channel gray image
+// dst: output, OTSU binary image, 8-bits 1-channel binary image
+// typ: input type, 0: P=(P>TH)?255:0;  1: P=(P>TH)?0:255;
+int otsu_threshold (const Mat& src, Mat& dst, int typ=0)
+{
   int threshold = 0;
   const int GrayScale = 256;
   int historgram[GrayScale] = {0};
@@ -83,7 +85,10 @@ int otsu_threshold (const Mat& src, Mat& dst) {
 
   for (int i=0; i < src.rows; i++) {
     for (int j=0; j < src.cols; j++) {
-      dst.at<uchar>(i, j) = (src.at<uchar>(i, j) > threshold) ? 255 : 0;
+      if (typ)
+        dst.at<uchar>(i, j) = (src.at<uchar>(i, j) > threshold) ? 0 : 255;
+      else
+        dst.at<uchar>(i, j) = (src.at<uchar>(i, j) > threshold) ? 255 : 0;
     }
   }
   return threshold;

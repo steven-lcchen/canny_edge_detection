@@ -11,9 +11,9 @@ a test code about without using global variable when call creatTtrackbar and do 
 $ ./compile.sh -o test_threshold test_threshold.cpp otsu_threshold.cpp  
 
 # canny_edge_detection
-Implement Canny edge detection algorithm with C++  
-practice with 2 Trackbar adjustment for threshold.  
+Implement Canny edge detection algorithm with C++ and practice with 2 Trackbar to adjust hysteresis threshold.  
+And then labeling connected components
 code: canny.cpp  
-$ ./compile.sh -o canny canny.cpp  
-$ canny image_file  
+$ ./compile.sh -o test_canny test_canny.cpp MyColorToGray.cpp MedianFilter.cpp BoxFilter.cpp MyCanny.cpp LabelConnected.cpp
+$ test_canny image_file  
 
