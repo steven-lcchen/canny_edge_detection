@@ -12,8 +12,8 @@ using namespace cv;
  
 // src: input,  8-bits 1-channel gray image
 // dst: output, OTSU binary image, 8-bits 1-channel binary image
-// typ: input type, 0: P=(P>TH)?255:0;  1: P=(P>TH)?0:255;
-int otsu_threshold (const Mat& src, Mat& dst, int typ=0)
+// inv: output type, 0: P=(P>TH)?255:0;  1: P=(P>TH)?0:255;
+int otsu_threshold (const Mat& src, Mat& dst, int inv=0)
 {
   int threshold = 0;
   const int GrayScale = 256;
@@ -85,7 +85,7 @@ int otsu_threshold (const Mat& src, Mat& dst, int typ=0)
 
   for (int i=0; i < src.rows; i++) {
     for (int j=0; j < src.cols; j++) {
-      if (typ)
+      if (inv)
         dst.at<uchar>(i, j) = (src.at<uchar>(i, j) > threshold) ? 0 : 255;
       else
         dst.at<uchar>(i, j) = (src.at<uchar>(i, j) > threshold) ? 255 : 0;

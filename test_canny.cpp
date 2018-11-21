@@ -24,6 +24,7 @@ void MedianFilter(const Mat& src, Mat& dst);
 void BoxFilter(const Mat& src, Mat& dst);
 void MyCanny(const Mat& src, Mat& detected_edges, int lo_threshold, int hi_threshold, bool L2gradient=true, bool debug=false);
 int  LabelConnected(const Mat& img, Mat& label, uint connectivity=8);
+int  otsu_threshold (const Mat& src, Mat& dst, int typ=0);
 
 // createTrackbar's UserData Structure
 struct tkbar_udata_struct {
@@ -85,7 +86,7 @@ void Adj_CannyThreshold(int lo_bar_val, int hi_bar_val, void* userdata)
   #else
     MyCanny(src_gray, detected_edges, lo_bar_val, hi_bar_val, L2gradient, DEBUG_SHOW);
   #endif
-  dbg_imshow("4: OCV Canny detected_edges", detected_edges);
+  dbg_imshow("4: Edge detection with Canny", detected_edges);
 
   // Using Canny's output as a mask, and display result
   Mat dst(src.size(), src.type(), Scalar::all(0));
@@ -101,16 +102,31 @@ void Adj_CannyThreshold(int lo_bar_val, int hi_bar_val, void* userdata)
   #endif
   cout << "num_objects = " << num_objects << endl;
 
+  RNG rnd_num( cvGetTickCount() ); // Random seed
   // Create output image coloring the objects
   Mat output= Mat::zeros(src.rows, src.cols, CV_8UC3);
-  RNG rnd_num( cvGetTickCount() ); // Random seed
   for(int i=1; i<num_objects; i++){
     Mat mask= labels==i;
     output.setTo(randomColor(rnd_num), mask);
     // imshow("mask"+to_string(i), output); // Steven
     // cout<<"Size of object["<<i<<"]="<<countNonZero(mask)<<endl;
   }
-  imshow("Result", output);
+  imshow("5: Find Edge Connected Components", output);
+
+  // find connected components with gray threshold image
+  Mat src_bin(src_gray.size(), CV_8UC1, Scalar(0));
+  otsu_threshold(src_gray, src_bin);
+  imshow("6.1: OTSU Binary Image", src_bin);
+  num_objects = LabelConnected(src_bin, labels, connectivity);
+
+  // Create output image coloring the objects
+  output= Mat::zeros(src.rows, src.cols, CV_8UC3);
+  for(int i=1; i<num_objects; i++){
+    Mat mask= labels==i;
+    output.setTo(randomColor(rnd_num), mask);
+  }
+  imshow("6.2: Find Binary Connected Components", output);
+
 }
 
 

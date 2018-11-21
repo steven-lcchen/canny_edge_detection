@@ -28,14 +28,18 @@ void MySobel (const Mat& src, Mat& grad_x, Mat& grad_y)
   // Vertical filter
   const Mat gy = (Mat_<int>(3, 3) << -1, -2, -1, 0, 0, 0, 1, 2, 1);
 
-  Mat raster;
   // Duplicate boundary for image
-  raster = Mat::zeros(src.rows+2, src.cols+2, src.type()); 
-  src.copyTo(raster(Rect(1, 1, src.cols, src.rows)));
-  raster.row(1).copyTo(raster.row(0));
-  raster.col(1).copyTo(raster.col(0));
-  raster.col(raster.cols-2).copyTo(raster.col(raster.cols-1));
-  raster.row(raster.rows-2).copyTo(raster.row(raster.rows-1));
+  //// Mat raster;
+  //// raster = Mat::zeros(src.rows+2, src.cols+2, src.type()); 
+  //// src.copyTo(raster(Rect(1, 1, src.cols, src.rows)));
+  //// raster.row(1).copyTo(raster.row(0));
+  //// raster.col(1).copyTo(raster.col(0));
+  //// raster.col(raster.cols-2).copyTo(raster.col(raster.cols-1));
+  //// raster.row(raster.rows-2).copyTo(raster.row(raster.rows-1));
+  // Learn to use another OCV function to duplicate boundary for image
+  int border = 1;
+  Mat raster(src.rows+border*2, src.cols+border*2, src.depth());
+  copyMakeBorder(src, raster, border, border, border, border, BORDER_REPLICATE);
 
   // Calculate Gx/Gy gradient
   for (int y=1; y<raster.rows-1; y++) {

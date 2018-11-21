@@ -12,7 +12,7 @@
 using namespace std;
 using namespace cv;
 
-int otsu_threshold (const Mat& src, Mat& dst, int typ=0);
+int otsu_threshold (const Mat& src, Mat& dst, int inv=0);
 int LabelConnected(const Mat& img, Mat& label, uint connectivity=8);
 
 // pack data into struct for track bar callback function

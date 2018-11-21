@@ -1,3 +1,5 @@
+SRC := ./src
+
 .PHONY: all clean
 
 all: test_CmdLineParser test_threshold test_canny 
@@ -11,11 +13,14 @@ test_threshold: test_threshold.o otsu_threshold.o LabelConnected.o
 	./compile.sh -o $@ $^
 
 # Test Canny edge detection
-test_canny: test_canny.o MyColorToGray.o MedianFilter.o BoxFilter.o MyCanny.o LabelConnected.o
+test_canny: test_canny.o MyColorToGray.o MedianFilter.o BoxFilter.o MyCanny.o LabelConnected.o otsu_threshold.o
 	./compile.sh -o $@ $^
 
 # Compile source codes
-%.o: %.cpp define.hpp
+%.o: $(SRC)/%.cpp define.hpp
+	./compile.sh -c -o $@ $(SRC)/$<
+
+test_%.o: %.cpp define.hpp
 	./compile.sh -c -o $@ $<
 
 clean:
