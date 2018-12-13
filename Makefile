@@ -5,23 +5,23 @@ SRC := ./src
 all: test_CmdLineParser test_threshold test_canny 
  
 # Test command line parser
-test_CmdLineParser: test_CmdLineParser.o
+test_CmdLineParser: obj/test_CmdLineParser.o
 	./compile.sh -o $@ $^
 
 # Test otsu threshold algorithm
-test_threshold: test_threshold.o otsu_threshold.o LabelConnected.o
+test_threshold: obj/test_threshold.o obj/otsu_threshold.o obj/LabelConnected.o
 	./compile.sh -o $@ $^
 
 # Test Canny edge detection
-test_canny: test_canny.o MyColorToGray.o MedianFilter.o BoxFilter.o MyCanny.o LabelConnected.o otsu_threshold.o
+test_canny: obj/test_canny.o obj/MyColorToGray.o obj/MedianFilter.o obj/BoxFilter.o obj/MyCanny.o obj/LabelConnected.o obj/otsu_threshold.o
 	./compile.sh -o $@ $^
 
 # Compile source codes
-%.o: $(SRC)/%.cpp define.hpp
-	./compile.sh -c -o $@ $(SRC)/$<
+obj/%.o: $(SRC)/%.cpp ./inc/define.hpp
+	./compile.sh -c -o $@ $< -Iinc
 
-test_%.o: %.cpp define.hpp
-	./compile.sh -c -o $@ $<
+obj/test_%.o: $(SRC)/%.cpp inc/define.hpp
+	./compile.sh -c -o $@ $< -Iinc
 
 clean:
-	\rm -f *.o 
+	\rm -f obj/*.o ./test_*
